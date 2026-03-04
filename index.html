@@ -1,90 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>India 360° Virtual Tour</title>
+
+<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+
+<style>
+body {
+  margin:0;
+  font-family: Arial, sans-serif;
+  background:#000;
+  overflow:hidden;
+}
+
+#ui {
+  position:absolute;
+  top:10px;
+  left:10px;
+  z-index:10;
+  background:rgba(0,0,0,0.6);
+  padding:12px;
+  border-radius:10px;
+  color:white;
+  width:300px;
+}
+
+button {
+  padding:6px 10px;
+  margin:4px 0;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.primary { background:#6c63ff; color:white; }
+.secondary { background:#444; color:white; }
+
+input {
+  width:100%;
+  padding:6px;
+  margin:6px 0;
+  border-radius:6px;
+  border:none;
+}
+
+#places {
+  max-height:200px;
+  overflow:auto;
+  margin-top:8px;
+}
+
+.place {
+  padding:6px;
+  cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,0.1);
+}
+
+.place:hover {
+  background:rgba(255,255,255,0.1);
+}
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+  <h3>🇮🇳 India 360° Tour</h3>
+
+  <button class="primary" onclick="goHome()">🏠 Home</button>
+  <button class="secondary" onclick="packCurrent()">🎒 Pack Current</button>
+  <button class="primary" onclick="packAndGo()">✈️ Pack & Go</button>
+
+  <input type="text" id="search" placeholder="Search location..." onkeyup="filterPlaces()">
+
+  <div id="places"></div>
+</div>
+
+<a-scene embedded>
+  <a-sky id="sky" rotation="0 -90 0"></a-sky>
+
+  <a-entity camera look-controls wasd-controls></a-entity>
+</a-scene>
+
+<script>
+
 const LOCATIONS = [
-  { id: 'home', title: 'Home — Travel Hub', subtitle: 'Welcome',
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/8/8e/Blue_sky.jpg',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/8/8e/Blue_sky.jpg'
-  },
-
   {
-    id: 'taj',
-    title: 'Taj Mahal',
-    subtitle: 'Agra, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/1/1e/Taj_Mahal_360_panorama.jpg'
+    id:"taj",
+    name:"Taj Mahal",
+    url:"https://upload.wikimedia.org/wikipedia/commons/3/3e/Taj_Mahal_in_March_2004.jpg"
   },
-
   {
-    id: 'qutub',
-    title: 'Qutub Minar',
-    subtitle: 'Delhi, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/3/32/Qutub_Minar_360.jpg'
+    id:"qutub",
+    name:"Qutub Minar",
+    url:"https://upload.wikimedia.org/wikipedia/commons/1/1f/Qutub_Minar_India.jpg"
   },
-
   {
-    id: 'hampi',
-    title: 'Hampi',
-    subtitle: 'Karnataka, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/0/02/Hampi_360_panorama.jpg'
+    id:"hampi",
+    name:"Hampi",
+    url:"https://upload.wikimedia.org/wikipedia/commons/4/4c/Hampi_India.jpg"
   },
-
   {
-    id: 'mysore',
-    title: 'Mysore Palace',
-    subtitle: 'Mysore, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/6/6c/Mysore_Palace_360.jpg'
+    id:"mysore",
+    name:"Mysore Palace",
+    url:"https://upload.wikimedia.org/wikipedia/commons/6/6c/Mysore_Palace.jpg"
   },
-
   {
-    id: 'ajanta',
-    title: 'Ajanta Caves',
-    subtitle: 'Maharashtra, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/5/52/Ajanta_Caves_360.jpg'
+    id:"ajanta",
+    name:"Ajanta Caves",
+    url:"https://upload.wikimedia.org/wikipedia/commons/5/5d/Ajanta_Caves.jpg"
   },
-
   {
-    id: 'ellora',
-    title: 'Ellora Caves',
-    subtitle: 'Maharashtra, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/2/2b/Ellora_Caves_360.jpg'
+    id:"ellora",
+    name:"Ellora Caves",
+    url:"https://upload.wikimedia.org/wikipedia/commons/2/2b/Ellora_Caves.jpg"
   },
-
   {
-    id: 'gateway',
-    title: 'Gateway of India',
-    subtitle: 'Mumbai, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/7/7e/Gateway_of_India_360.jpg'
+    id:"gateway",
+    name:"Gateway of India",
+    url:"https://upload.wikimedia.org/wikipedia/commons/d/d3/Gateway_of_India.jpg"
   },
-
   {
-    id: 'varanasi',
-    title: 'Varanasi Ghats',
-    subtitle: 'Uttar Pradesh, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/9/9f/Varanasi_Ghat_360.jpg'
+    id:"varanasi",
+    name:"Varanasi Ghats",
+    url:"https://upload.wikimedia.org/wikipedia/commons/5/5c/Varanasi_Ghat.jpg"
   },
-
   {
-    id: 'konark',
-    title: 'Konark Sun Temple',
-    subtitle: 'Odisha, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/4/4c/Konark_Temple_360.jpg'
+    id:"konark",
+    name:"Konark Sun Temple",
+    url:"https://upload.wikimedia.org/wikipedia/commons/4/4c/Konark_Sun_Temple.jpg"
   },
-
   {
-    id: 'pangong',
-    title: 'Pangong Lake',
-    subtitle: 'Ladakh, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/0/03/Pangong_Lake_360.jpg'
+    id:"pangong",
+    name:"Pangong Lake",
+    url:"https://upload.wikimedia.org/wikipedia/commons/0/03/Pangong_Tso_Lake.jpg"
   },
-
   {
-    id: 'backwaters',
-    title: 'Kerala Backwaters',
-    subtitle: 'Kerala, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/2/21/Kerala_Backwaters_360.jpg'
+    id:"backwaters",
+    name:"Kerala Backwaters",
+    url:"https://upload.wikimedia.org/wikipedia/commons/3/35/Kerala_Backwaters.jpg"
   },
-
   {
-    id: 'goa',
-    title: 'Goa Beaches',
-    subtitle: 'Goa, India',
-    full: 'https://upload.wikimedia.org/wikipedia/commons/5/5a/Goa_Beach_360.jpg'
+    id:"goa",
+    name:"Goa Beaches",
+    url:"https://upload.wikimedia.org/wikipedia/commons/5/5a/Goa_Beach.jpg"
   }
 ];
+
+let bag = [];
+let current = null;
+
+const sky = document.getElementById("sky");
+const placesDiv = document.getElementById("places");
+
+function loadPlaces() {
+  placesDiv.innerHTML = "";
+  LOCATIONS.forEach(loc => {
+    const div = document.createElement("div");
+    div.className = "place";
+    div.innerText = loc.name;
+    div.onclick = () => loadLocation(loc);
+    placesDiv.appendChild(div);
+  });
+}
+
+function loadLocation(loc) {
+  sky.setAttribute("src", loc.url);
+  current = loc;
+}
+
+function goHome() {
+  sky.removeAttribute("src");
+  current = null;
+}
+
+function packCurrent() {
+  if (!current) return alert("No location selected.");
+  if (bag.includes(current)) return alert("Already packed!");
+  bag.push(current);
+  alert(current.name + " added to bag.");
+}
+
+async function packAndGo() {
+  if (bag.length === 0) return alert("Bag is empty!");
+  for (let loc of bag) {
+    loadLocation(loc);
+    await new Promise(r => setTimeout(r, 3000));
+  }
+  bag = [];
+  alert("Trip complete! Returning home.");
+  goHome();
+}
+
+function filterPlaces() {
+  const value = document.getElementById("search").value.toLowerCase();
+  placesDiv.innerHTML = "";
+  LOCATIONS.filter(loc => loc.name.toLowerCase().includes(value))
+           .forEach(loc => {
+              const div = document.createElement("div");
+              div.className = "place";
+              div.innerText = loc.name;
+              div.onclick = () => loadLocation(loc);
+              placesDiv.appendChild(div);
+           });
+}
+
+loadPlaces();
+
+</script>
+
+</body>
+</html>
