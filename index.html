@@ -8,57 +8,61 @@
 <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
 <style>
-body {
+body{
   margin:0;
-  font-family: Arial, sans-serif;
-  background:#000;
+  font-family:Arial, sans-serif;
+  background:black;
   overflow:hidden;
 }
 
-#ui {
+#ui{
   position:absolute;
-  top:10px;
-  left:10px;
+  top:15px;
+  left:15px;
   z-index:10;
-  background:rgba(0,0,0,0.6);
-  padding:12px;
-  border-radius:10px;
-  color:white;
+  background:rgba(0,0,0,0.65);
+  padding:15px;
+  border-radius:12px;
   width:300px;
+  color:white;
+  backdrop-filter:blur(8px);
 }
 
-button {
-  padding:6px 10px;
+h3{margin-top:0}
+
+button{
+  padding:7px 12px;
   margin:4px 0;
   border:none;
-  border-radius:6px;
+  border-radius:8px;
   cursor:pointer;
+  font-weight:bold;
 }
 
-.primary { background:#6c63ff; color:white; }
-.secondary { background:#444; color:white; }
+.primary{background:#6c63ff;color:white;}
+.secondary{background:#444;color:white;}
 
-input {
+input{
   width:100%;
   padding:6px;
-  margin:6px 0;
-  border-radius:6px;
+  margin-top:8px;
+  border-radius:8px;
   border:none;
 }
 
-#places {
-  max-height:200px;
+#places{
+  max-height:220px;
   overflow:auto;
   margin-top:8px;
 }
 
-.place {
+.place{
   padding:6px;
   cursor:pointer;
   border-bottom:1px solid rgba(255,255,255,0.1);
 }
 
-.place:hover {
+.place:hover{
   background:rgba(255,255,255,0.1);
 }
 </style>
@@ -74,137 +78,149 @@ input {
   <button class="primary" onclick="packAndGo()">✈️ Pack & Go</button>
 
   <input type="text" id="search" placeholder="Search location..." onkeyup="filterPlaces()">
-
   <div id="places"></div>
 </div>
 
 <a-scene embedded>
-  <a-sky id="sky" rotation="0 -90 0"></a-sky>
-
+  <a-sky id="sky" rotation="0 -90 0" material="shader: flat; opacity:1"></a-sky>
   <a-entity camera look-controls wasd-controls></a-entity>
 </a-scene>
 
 <script>
 
 const LOCATIONS = [
-  {
-    id:"taj",
-    name:"Taj Mahal",
-    url:"https://upload.wikimedia.org/wikipedia/commons/3/3e/Taj_Mahal_in_March_2004.jpg"
-  },
-  {
-    id:"qutub",
-    name:"Qutub Minar",
-    url:"https://upload.wikimedia.org/wikipedia/commons/1/1f/Qutub_Minar_India.jpg"
-  },
-  {
-    id:"hampi",
-    name:"Hampi",
-    url:"https://upload.wikimedia.org/wikipedia/commons/4/4c/Hampi_India.jpg"
-  },
-  {
-    id:"mysore",
-    name:"Mysore Palace",
-    url:"https://upload.wikimedia.org/wikipedia/commons/6/6c/Mysore_Palace.jpg"
-  },
-  {
-    id:"ajanta",
-    name:"Ajanta Caves",
-    url:"https://upload.wikimedia.org/wikipedia/commons/5/5d/Ajanta_Caves.jpg"
-  },
-  {
-    id:"ellora",
-    name:"Ellora Caves",
-    url:"https://upload.wikimedia.org/wikipedia/commons/2/2b/Ellora_Caves.jpg"
-  },
-  {
-    id:"gateway",
-    name:"Gateway of India",
-    url:"https://upload.wikimedia.org/wikipedia/commons/d/d3/Gateway_of_India.jpg"
-  },
-  {
-    id:"varanasi",
-    name:"Varanasi Ghats",
-    url:"https://upload.wikimedia.org/wikipedia/commons/5/5c/Varanasi_Ghat.jpg"
-  },
-  {
-    id:"konark",
-    name:"Konark Sun Temple",
-    url:"https://upload.wikimedia.org/wikipedia/commons/4/4c/Konark_Sun_Temple.jpg"
-  },
-  {
-    id:"pangong",
-    name:"Pangong Lake",
-    url:"https://upload.wikimedia.org/wikipedia/commons/0/03/Pangong_Tso_Lake.jpg"
-  },
-  {
-    id:"backwaters",
-    name:"Kerala Backwaters",
-    url:"https://upload.wikimedia.org/wikipedia/commons/3/35/Kerala_Backwaters.jpg"
-  },
-  {
-    id:"goa",
-    name:"Goa Beaches",
-    url:"https://upload.wikimedia.org/wikipedia/commons/5/5a/Goa_Beach.jpg"
-  }
+{ name:"Taj Mahal", url:"https://upload.wikimedia.org/wikipedia/commons/3/3e/Taj_Mahal_in_March_2004.jpg" },
+{ name:"Qutub Minar", url:"https://upload.wikimedia.org/wikipedia/commons/1/1f/Qutub_Minar_India.jpg" },
+{ name:"Hampi", url:"https://upload.wikimedia.org/wikipedia/commons/4/4c/Hampi_India.jpg" },
+{ name:"Mysore Palace", url:"https://upload.wikimedia.org/wikipedia/commons/6/6c/Mysore_Palace.jpg" },
+{ name:"Ajanta Caves", url:"https://upload.wikimedia.org/wikipedia/commons/5/5d/Ajanta_Caves.jpg" },
+{ name:"Ellora Caves", url:"https://upload.wikimedia.org/wikipedia/commons/2/2b/Ellora_Caves.jpg" },
+{ name:"Gateway of India", url:"https://upload.wikimedia.org/wikipedia/commons/d/d3/Gateway_of_India.jpg" },
+{ name:"Varanasi Ghats", url:"https://upload.wikimedia.org/wikipedia/commons/5/5c/Varanasi_Ghat.jpg" },
+{ name:"Konark Sun Temple", url:"https://upload.wikimedia.org/wikipedia/commons/4/4c/Konark_Sun_Temple.jpg" },
+{ name:"Pangong Lake", url:"https://upload.wikimedia.org/wikipedia/commons/0/03/Pangong_Tso_Lake.jpg" },
+{ name:"Kerala Backwaters", url:"https://upload.wikimedia.org/wikipedia/commons/3/35/Kerala_Backwaters.jpg" },
+{ name:"Goa Beaches", url:"https://upload.wikimedia.org/wikipedia/commons/5/5a/Goa_Beach.jpg" }
 ];
 
 let bag = [];
 let current = null;
-
 const sky = document.getElementById("sky");
 const placesDiv = document.getElementById("places");
 
-function loadPlaces() {
-  placesDiv.innerHTML = "";
-  LOCATIONS.forEach(loc => {
-    const div = document.createElement("div");
-    div.className = "place";
-    div.innerText = loc.name;
-    div.onclick = () => loadLocation(loc);
+function loadPlaces(){
+  placesDiv.innerHTML="";
+  LOCATIONS.forEach(loc=>{
+    const div=document.createElement("div");
+    div.className="place";
+    div.innerText=loc.name;
+    div.onclick=()=>loadLocation(loc);
     placesDiv.appendChild(div);
   });
 }
 
-function loadLocation(loc) {
-  sky.setAttribute("src", loc.url);
-  current = loc;
+function smoothFadeOut(){
+  let opacity=1;
+  return new Promise(resolve=>{
+    const fade=setInterval(()=>{
+      opacity-=0.05;
+      sky.setAttribute("material","opacity",opacity);
+      if(opacity<=0){
+        clearInterval(fade);
+        resolve();
+      }
+    },20);
+  });
 }
 
-function goHome() {
-  sky.removeAttribute("src");
-  current = null;
+function smoothFadeIn(){
+  let opacity=0;
+  return new Promise(resolve=>{
+    const fade=setInterval(()=>{
+      opacity+=0.05;
+      sky.setAttribute("material","opacity",opacity);
+      if(opacity>=1){
+        clearInterval(fade);
+        resolve();
+      }
+    },20);
+  });
 }
 
-function packCurrent() {
-  if (!current) return alert("No location selected.");
-  if (bag.includes(current)) return alert("Already packed!");
+async function loadLocation(loc){
+  current=loc;
+
+  await smoothFadeOut();
+
+  const img=new Image();
+  img.crossOrigin="anonymous";
+  img.src=loc.url;
+
+  img.onload=function(){
+
+    const targetRatio=2;
+    let cropWidth=img.width;
+    let cropHeight=img.width/targetRatio;
+
+    if(cropHeight>img.height){
+      cropHeight=img.height;
+      cropWidth=img.height*targetRatio;
+    }
+
+    const startX=(img.width-cropWidth)/2;
+    const startY=(img.height-cropHeight)/2;
+
+    const canvas=document.createElement("canvas");
+    canvas.width=cropWidth;
+    canvas.height=cropHeight;
+
+    const ctx=canvas.getContext("2d");
+    ctx.drawImage(img,startX,startY,cropWidth,cropHeight,0,0,cropWidth,cropHeight);
+
+    const cropped=canvas.toDataURL("image/jpeg",0.95);
+    sky.setAttribute("src",cropped);
+
+    smoothFadeIn();
+  };
+}
+
+function goHome(){
+  smoothFadeOut().then(()=>{
+    sky.removeAttribute("src");
+    current=null;
+    smoothFadeIn();
+  });
+}
+
+function packCurrent(){
+  if(!current)return alert("Select a location first.");
+  if(bag.includes(current))return alert("Already packed!");
   bag.push(current);
-  alert(current.name + " added to bag.");
+  alert(current.name+" added to bag.");
 }
 
-async function packAndGo() {
-  if (bag.length === 0) return alert("Bag is empty!");
-  for (let loc of bag) {
-    loadLocation(loc);
-    await new Promise(r => setTimeout(r, 3000));
+async function packAndGo(){
+  if(bag.length===0)return alert("Bag is empty!");
+  for(let loc of bag){
+    await loadLocation(loc);
+    await new Promise(r=>setTimeout(r,3000));
   }
-  bag = [];
-  alert("Trip complete! Returning home.");
+  bag=[];
+  alert("Trip complete! Returning Home.");
   goHome();
 }
 
-function filterPlaces() {
-  const value = document.getElementById("search").value.toLowerCase();
-  placesDiv.innerHTML = "";
-  LOCATIONS.filter(loc => loc.name.toLowerCase().includes(value))
-           .forEach(loc => {
-              const div = document.createElement("div");
-              div.className = "place";
-              div.innerText = loc.name;
-              div.onclick = () => loadLocation(loc);
-              placesDiv.appendChild(div);
-           });
+function filterPlaces(){
+  const value=document.getElementById("search").value.toLowerCase();
+  placesDiv.innerHTML="";
+  LOCATIONS.filter(loc=>loc.name.toLowerCase().includes(value))
+  .forEach(loc=>{
+    const div=document.createElement("div");
+    div.className="place";
+    div.innerText=loc.name;
+    div.onclick=()=>loadLocation(loc);
+    placesDiv.appendChild(div);
+  });
 }
 
 loadPlaces();
