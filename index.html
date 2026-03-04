@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>360° Virtual Tour — Pack & Go</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- A-Frame for WebXR / 360 scenes -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <!-- optional: simple icon set -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b0f1a;
+      --card: rgba(255,255,255,0.06);
+      --accent: #9b8cff;
+      --glass: rgba(255,255,255,0.06);
+      --text: #eaf0ff;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;}
+    #app{
+      position:fixed;inset:0;display:flex;flex-direction:row;align-items:stretch;
+      background: linear-gradient(180deg,#05060a, #0b0f1a 60%);
+      color:var(--text);
+      overflow:hidden;
+    }
+
+    /* left: VR scene (fills) */
+    #scene-wrap{flex:1;position:relative;min-width:0;}
+
+    /* top-left UI / controls */
+    .ui-panel{
+      position:absolute;left:18px;top:18px;background:var(--card);backdrop-filter: blur(6px);
+      border-radius:12px;padding:12px 14px;box-shadow:0 6px 18px rgba(0,0,0,0.6);z-index:20;
+    }
+    .ui-row{display:flex;gap:8px;align-items:center}
+    .btn{
+      background:linear-gradient(180deg,var(--accent),#5f47ff);border:none;color:white;padding:8px 12px;border-radius:8px;
+      cursor:pointer;font-weight:600;letter-spacing:0.2px;
+    }
+    .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 10px;color:var(--text);border-radius:8px}
+    input.search{
+      padding:8px 10px;border-radius:10px;border:none;background:rgba(255,255,255,0.03);color:var(--text);min-width:220px;
+    }
+    /* right: sidebar for list, pack bags */
+    #sidebar{
+      width:340px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      box-shadow: -6px 0 24px rgba(0,0,0,0.6);padding:18px;display:flex;flex-direction:column;gap:12px;
+      z-index:30;
+    }
+    h2{margin:0 0 4px 0;font-size:16px}
+    .place-list{overflow:auto;flex:1;padding-right:6px}
+    .place-row{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;margin-bottom:8px;background:linear-gradient(90deg, rgba(255,255,255,0.01), transparent);}
+    .place-row .title{font-weight:600}
+    .small{font-size:13px;color:rgba(255,255,255,0.6)}
+    .pack-btn{background:transparent;border:1px dashed rgba(255,255,255,0.08);padding:6px 8px;border-radius:8px;color:var(--text);cursor:pointer}
+    footer{font-size:13px;color:rgba(255,255,255,0.6);padding-top:6px}
+
+    /* loader overlay */
+    #loader{
+      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:40;pointer-events:none;
+    }
+    .spinner{
+      width:80px;height:80px;border-radius:50%;background:
+      conic-gradient(var(--accent), transparent 60%);filter:blur(4px);opacity:0.95;
+      animation:spin 1.6s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* hotspot style inside a-frame using CSS*/
+    .hotspot-label{padding:6px 10px;background:var(--glass);border-radius:10px;color:var(--text);border:1px solid rgba(255,255,255,0.03)}
+    /* responsive: hide sidebar on small widths */
+    @media (max-width:900px){#sidebar{display:none}}
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="scene-wrap">
+      <!-- UI -->
+      <div class="ui-panel" id="top-ui">
+        <div class="ui-row" style="gap:10px">
+          <button class="btn" id="homeBtn" title="Back to home">🏠 Home</button>
+          <button class="ghost" id="packCurrentBtn" title="Add current place to Bag">🎒 Pack current</button>
+          <button class="ghost" id="packGoBtn" title="Pack & Go">✈️ Pack & Go</button>
+          <input class="search" id="searchInput" placeholder="Search locations or filter..." />
+        </div>
+      </div>
+
+      <!-- loader -->
+      <div id="loader" aria-hidden="true"><div class="spinner"></div></div>
+
+      <!-- A-Frame canvas -->
+      <a-scene id="scene" embedded vr-mode-ui="enabled: true" renderer="antialias: true; physicallyCorrectLights: true">
+        <!-- a-sky will be updated with panoramas -->
+        <a-entity id="cameraRig" position="0 1.6 0">
+          <a-entity camera look-controls wasd-controls></a-entity>
+        </a-entity>
+        <a-sky id="panorama" radius="5000" rotation="0 -90 0" src=""></a-sky>
+
+        <!-- hotspots container -->
+        <a-entity id="hotspots"></a-entity>
+
+        <!-- subtle ambient light for 3D hotspots -->
+        <a-entity light="type: ambient; intensity: 0.8"></a-entity>
+      </a-scene>
+    </div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" role="complementary" aria-label="Places and Bag">
+      <div>
+        <h2>Explore: Handpicked 360° spots</h2>
+        <div class="small">Click a place to jump. Add to bag to create a trip.</div>
+      </div>
+
+      <div class="place-list" id="placeList">
+        <!-- places populated by JS -->
+      </div>
+
+      <div>
+        <h3 style="margin:0 0 6px 0">Your Bag</h3>
+        <div id="bagList" style="min-height:54px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);padding:8px;border-radius:8px">
+          <div class="small" id="bagEmpty">No packed places yet — add with 🎒</div>
+        </div>
+      </div>
+
+      <footer>Built with A-Frame • Replace images inside <code>images/</code> or use external equirectangular URLs</footer>
+    </aside>
+  </div>
+
+<script>
+/*
+  DATA:
+  Each location should have:
+   - id, title, subtitle
+   - preview: low-res/effect image (fast to load)
+   - full: high-res equirectangular image (used for final)
+   - hotspots: optional list of hotspots { yaw, pitch, targetId, label }
+*/
+
+const LOCATIONS = [
+  { id: 'home', title: 'Home — Travel Hub', subtitle: 'Welcome', preview: 'images/home_low.jpg', full: 'images/home_hr.jpg', hotspots: [] },
+
+  /* India locations (replace preview/full with your equirectangular panorama URLs).
+     Good idea: provide both a small preview (1000–2000px wide) and a high-res (8000–16000px) for realism. */
+  { id: 'taj', title: 'Taj Mahal', subtitle: 'Agra, Uttar Pradesh', preview: 'images/taj_low.jpg', full: 'images/taj_hr.jpg',
+    hotspots: [{ yaw: 30, pitch: 0, targetId: 'qutub', label: 'Next: Qutub Minar' }] },
+
+  { id: 'qutub', title: 'Qutub Minar', subtitle: 'Delhi', preview: 'images/qutub_low.jpg', full: 'images/qutub_hr.jpg',
+    hotspots: [{ yaw: -100, pitch: 5, targetId: 'hampi', label: 'Next: Hampi' }] },
+
+  { id: 'hampi', title: 'Hampi', subtitle: 'Karnataka', preview: 'images/hampi_low.jpg', full: 'images/hampi_hr.jpg',
+    hotspots: [{ yaw: 160, pitch: -3, targetId: 'mysore', label: 'Next: Mysore Palace' }] },
+
+  { id: 'mysore', title: 'Mysore Palace', subtitle: 'Mysore, Karnataka', preview: 'images/mysore_low.jpg', full: 'images/mysore_hr.jpg' },
+
+  { id: 'ajanta', title: 'Ajanta Caves', subtitle: 'Aurangabad, Maharashtra', preview: 'images/ajanta_low.jpg', full: 'images/ajanta_hr.jpg' },
+
+  { id: 'ellora', title: 'Ellora Caves', subtitle: 'Aurangabad, Maharashtra', preview: 'images/ellora_low.jpg', full: 'images/ellora_hr.jpg' },
+
+  { id: 'gateway', title: 'Gateway of India', subtitle: 'Mumbai, Maharashtra', preview: 'images/gateway_low.jpg', full: 'images/gateway_hr.jpg' },
+
+  { id: 'varanasi', title: 'Varanasi Ghats', subtitle: 'Varanasi, Uttar Pradesh', preview: 'images/varanasi_low.jpg', full: 'images/varanasi_hr.jpg' },
+
+  { id: 'konark', title: 'Konark Sun Temple', subtitle: 'Konark, Odisha', preview: 'images/konark_low.jpg', full: 'images/konark_hr.jpg' },
+
+  { id: 'pangong', title: 'Pangong Lake', subtitle: 'Ladakh', preview: 'images/pangong_low.jpg', full: 'images/pangong_hr.jpg' },
+
+  { id: 'backwaters', title: 'Kerala Backwaters', subtitle: 'Alappuzha, Kerala', preview: 'images/backwaters_low.jpg', full: 'images/backwaters_hr.jpg' },
+
+  { id: 'goa', title: 'Goa Beaches', subtitle: 'Panaji, Goa', preview: 'images/goa_low.jpg', full: 'images/goa_hr.jpg' },
+
+  /* global example */
+  { id: 'machu', title: 'Machu Picchu (example)', subtitle: 'Cusco Region, Peru', preview: 'images/machu_low.jpg', full: 'images/machu_hr.jpg' },
+];
+
+/* app state */
+let currentId = 'home';
+const bag = [];
+
+/* DOM refs */
+const placeListEl = document.getElementById('placeList');
+const bagListEl = document.getElementById('bagList');
+const bagEmptyEl = document.getElementById('bagEmpty');
+const searchInput = document.getElementById('searchInput');
+const loader = document.getElementById('loader');
+const packCurrentBtn = document.getElementById('packCurrentBtn');
+const packGoBtn = document.getElementById('packGoBtn');
+const homeBtn = document.getElementById('homeBtn');
+
+/* A-Frame refs */
+const sceneEl = document.querySelector('a-scene');
+const skyEl = document.getElementById('panorama');
+const hotspotsContainer = document.getElementById('hotspots');
+
+/* Utilities */
+function showLoader(on=true){
+  loader.style.pointerEvents = on ? 'all' : 'none';
+  loader.style.display = on ? 'flex' : 'none';
+}
+
+/* Preload an image, returns Promise */
+function preloadImage(url){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = (e)=> reject(e);
+    img.src = url;
+  });
+}
+
+/* Smooth transition: fade sky opacity while swapping texture */
+async function setSceneById(id){
+  const loc = LOCATIONS.find(l => l.id === id);
+  if(!loc) return console.warn('unknown loc', id);
+  currentId = id;
+  showLoader(true);
+
+  // set low-res first for fast perceived load
+  if(loc.preview){
+    skyEl.setAttribute('src', loc.preview);
+  } else {
+    skyEl.removeAttribute('src');
+  }
+
+  // remove old hotspots
+  while(hotspotsContainer.firstChild) hotspotsContainer.removeChild(hotspotsContainer.firstChild);
+
+  // fade out camera view slightly (using sky opacity trick)
+  skyEl.setAttribute('animation__fadeout', 'property: material.opacity; to: 0.6; dur: 240; easing: easeInOutQuad');
+
+  try {
+    // preload high-res then swap
+    if(loc.full){
+      await preloadImage(loc.full); // will throw if fails
+      // small delay for UX
+      await new Promise(r=>setTimeout(r, 200));
+      skyEl.setAttribute('src', loc.full);
+    }
+  } catch(e){
+    console.warn('high-res load failed, continuing with preview', e);
+  } finally {
+    // fade back to full opacity
+    skyEl.setAttribute('animation__fadein', 'property: material.opacity; to: 1; dur: 300; easing: easeInOutQuad');
+    showLoader(false);
+  }
+
+  // populate hotspots if present
+  if(loc.hotspots && loc.hotspots.length){
+    loc.hotspots.forEach(h => createHotspot(h));
+  }
+}
+
+/* create a 3D hotspot entity */
+function createHotspot(h){
+  // hotspot as a ring and a label
+  const group = document.createElement('a-entity');
+  group.setAttribute('position', '0 1.6 -3');
+  // convert yaw/pitch to 3D position on sphere (approximate)
+  const {x,y,z} = yawPitchToVector(h.yaw, h.pitch, 5.0);
+  group.setAttribute('position', `${x} ${y} ${z}`);
+
+  // clickable ring
+  const ring = document.createElement('a-ring');
+  ring.setAttribute('radius-inner', '0.22');
+  ring.setAttribute('radius-outer', '0.35');
+  ring.setAttribute('material', 'shader:flat;opacity:0.95');
+  ring.setAttribute('class', 'hotspot-ring');
+  ring.setAttribute('scale', '0.8 0.8 0.8');
+
+  // label as 2D plane
+  const label = document.createElement('a-entity');
+  label.setAttribute('geometry', 'primitive: plane; height: 0.28; width: 1.2');
+  label.setAttribute('material', 'shader:flat;opacity:0.85');
+  label.setAttribute('text', `value: ${h.label}; align:center; width: 2.2; wrapCount:26; color: #fff;`);
+  label.setAttribute('position', '0 0.45 0');
+
+  // event
+  ring.addEventListener('click', ()=> setSceneById(h.targetId));
+  group.appendChild(ring);
+  group.appendChild(label);
+  hotspotsContainer.appendChild(group);
+}
+
+/* convert yaw (deg) and pitch (deg) to 3D vector on sphere radius r */
+function yawPitchToVector(yaw, pitch, r=5){
+  // yaw: rotate around Y axis (left/right), pitch: up/down
+  const y = r * Math.sin(degToRad(pitch));
+  const cosPitch = Math.cos(degToRad(pitch));
+  const x = r * Math.sin(degToRad(yaw)) * cosPitch;
+  const z = -r * Math.cos(degToRad(yaw)) * cosPitch;
+  return {x: x.toFixed(3), y: y.toFixed(3), z: z.toFixed(3)};
+}
+function degToRad(d){ return d * Math.PI / 180; }
+
+/* Populate sidebar list */
+function renderPlaceList(filter=''){
+  placeListEl.innerHTML = '';
+  const places = LOCATIONS.filter(l => l.id !== 'home' && (l.title.toLowerCase().includes(filter) || l.subtitle.toLowerCase().includes(filter)));
+  places.forEach(p=>{
+    const row = document.createElement('div');
+    row.className = 'place-row';
+    row.innerHTML = `
+      <div style="display:flex;flex-direction:column;">
+        <div class="title">${p.title}</div>
+        <div class="small">${p.subtitle}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="ghost jump-btn" data-id="${p.id}">Go</button>
+        <button class="pack-btn" data-id="${p.id}">🎒</button>
+      </div>
+    `;
+    placeListEl.appendChild(row);
+  });
+
+  // bind events
+  document.querySelectorAll('.jump-btn').forEach(btn=>{
+    btn.onclick = () => setSceneById(btn.dataset.id);
+  });
+  document.querySelectorAll('.pack-btn').forEach(btn=>{
+    btn.onclick = () => addToBag(btn.dataset.id);
+  });
+}
+
+/* Bag management */
+function addToBag(id){
+  if(bag.includes(id)) return alert('Already packed!');
+  bag.push(id);
+  renderBag();
+}
+function removeFromBag(index){
+  bag.splice(index,1);
+  renderBag();
+}
+function renderBag(){
+  bagListEl.innerHTML = '';
+  if(bag.length === 0){
+    bagListEl.appendChild(bagEmptyEl);
+    return;
+  }
+  bag.forEach((id, idx) => {
+    const p = LOCATIONS.find(l=>l.id===id) || {title:id};
+    const el = document.createElement('div');
+    el.style.display = 'flex'; el.style.justifyContent='space-between'; el.style.alignItems='center';
+    el.style.marginBottom='8px';
+    el.innerHTML = `<div><strong>${p.title}</strong><div class="small">${p.subtitle}</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="ghost" data-idx="${idx}" title="remove">✖</button>
+      </div>`;
+    bagListEl.appendChild(el);
+  });
+  // bind removals & click to jump
+  bagListEl.querySelectorAll('button').forEach(btn=>{
+    btn.onclick = ()=> removeFromBag(Number(btn.dataset.idx));
+  });
+}
+
+/* Pack & Go: tour bag sequentially */
+async function packAndGo(){
+  if(bag.length === 0) return alert('Your bag is empty. Pack some places first.');
+  // simple sequential visit
+  for(let id of [...bag]){
+    await setSceneById(id);
+    // small dwell time to "experience" place
+    await new Promise(r=>setTimeout(r, 2500));
+  }
+  // after finishing, clear bag (optional)
+  bag.length = 0;
+  renderBag();
+  alert('Trip complete! Back to home.');
+  setSceneById('home');
+}
+
+/* UI bindings */
+searchInput.addEventListener('input', (e)=> renderPlaceList(e.target.value.trim().toLowerCase()));
+packCurrentBtn.addEventListener('click', ()=> addToBag(currentId));
+packGoBtn.addEventListener('click', ()=> packAndGo());
+homeBtn.addEventListener('click', ()=> setSceneById('home'));
+
+/* initial render */
+renderPlaceList('');
+renderBag();
+
+/* load initial scene */
+window.addEventListener('load', ()=> setSceneById('home'));
+
+/* Helpful tip: handle window resize for A-Frame embedded */
+window.addEventListener('resize', ()=> {
+  const sceneCanvas = document.querySelector('canvas');
+  if(sceneCanvas) sceneCanvas.style.width = '100%';
+});
+</script>
+</body>
+</html>
